@@ -1,0 +1,196 @@
+---
+title: "Citation Screening Comparison: Calculate Performance"
+author: "Emma Wilson"
+output: html_document
+---
+
+## Load packages
+
+```{r, message=FALSE, warning = FALSE}
+# Running RStudio and R Version  4.2.1
+
+library(caret)   #V6.0-92
+library(dplyr)   #V1.0.9
+library(ggplot2) #V3.3.6
+```
+
+
+## Read in Data
+
+Read in the dataset containing all cleaned and validated screening data.
+
+```{r}
+# Dataset of all manual screening decisions and regex decisions
+dat <- read.csv("data/screening_data_clean.csv", stringsAsFactors = T)
+```
+
+
+# Create Empty Dataframe to Store Results
+
+Results from the code chunks below will be added to this dataframe.
+
+```{r}
+#Create an empty dataframe with 9 columns and 0 rows
+results <- data.frame(matrix(ncol = 9, nrow = 0))
+# Create a vector with values to use as column names
+cols <- c("Screening_Type", "Threshold", "Sensitivity", "Specificity", "Precision", "N_True_Positives", "N_True_Negatives", "N_False_Positives", "N_False_Negatives")
+# Assign column names to empty dataframe
+colnames(results) <- cols
+```
+
+
+# Manual Title and Abstract Screening Results
+
+Use the caret package to work out the sensitivity, specificity, and precision of manual tiab screening.
+
+```{r}
+# Add results to dataframe
+result_m_tiab <- data.frame(
+  "Manual_TiAb",
+  NA,
+  sensitivity(dat$Manual_TiAb, dat$Gold_Standard, positive = "Included"),
+  specificity(dat$Manual_TiAb, dat$Gold_Standard, negative = "Excluded"),
+  precision(dat$Manual_TiAb, dat$Gold_Standard, relevant = "Included"),
+  nrow(dat %>% filter(Manual_TiAb == "Included" & Gold_Standard == "Included")),
+  nrow(dat %>% filter(Manual_TiAb == "Excluded" & Gold_Standard == "Excluded")),
+  nrow(dat %>% filter(Manual_TiAb == "Included" & Gold_Standard == "Excluded")),
+  nrow(dat %>% filter(Manual_TiAb == "Excluded" & Gold_Standard == "Included")))
+names(result_m_tiab) <- cols
+# Attach Manual TiAb screening results onto the results dataframe
+results <- rbind(results, result_m_tiab)
+
+# Clean R environment
+rm(result_m_tiab)
+```
+
+
+# Manual Full Text Screening Results
+
+Use the caret package to work out the sensitivity, specificity, and precision of manual full-text screening.
+
+```{r}
+# Add results to dataframe
+result_m_fulltext <- data.frame(
+  "Manual_FullText",
+  NA,
+  sensitivity(dat$Manual_FullText, dat$Gold_Standard, positive = "Included"),
+  specificity(dat$Manual_FullText, dat$Gold_Standard, negative = "Excluded"),
+  precision(dat$Manual_FullText, dat$Gold_Standard, relevant = "Included"),
+  nrow(dat %>% filter(Manual_FullText == "Included" & Gold_Standard == "Included")),
+  nrow(dat %>% filter(Manual_FullText == "Excluded" & Gold_Standard == "Excluded")),
+  nrow(dat %>% filter(Manual_FullText == "Included" & Gold_Standard == "Excluded")),
+  nrow(dat %>% filter(Manual_FullText == "Excluded" & Gold_Standard == "Included")))
+names(result_m_fulltext) <- cols
+# Attach Manual TiAb screening results onto the results dataframe
+results <- rbind(results, result_m_fulltext)
+
+# Clean R environment
+rm(result_m_fulltext, cols)
+```
+
+
+## Regex TiAb Screening Analysis
+
+Use the caret package to work out the sensitivity and specificity of regex tiab screening. Add values to the results dataframe.
+
+```{r}
+# Create vectors containing names of all columns relevant to regex tiab screening
+cols_r_tiab <- colnames(select(dat,contains("Regex_TiAb_")))
+
+# Add results to dataframe
+result_r_tiab <- data.frame(Screening_Type = rep("Regex_TiAb", length(unique(dat$Regex_TiAb))),
+                            Threshold = sort(unique(dat$Regex_TiAb)),
+                            Sensitivity = lapply(dat[cols_r_tiab], sensitivity,
+                                   reference = dat[["Gold_Standard"]], 
+                                   positive = "Included") %>%
+                              unlist() %>%
+                              unname(),
+                            Specificity = lapply(dat[cols_r_tiab], specificity,
+                                   reference = dat[["Gold_Standard"]],
+                                   negative = "Excluded") %>%
+                              unlist() %>%
+                              unname(),
+                            N_True_Positives = lapply(dat[cols_r_tiab], function(x){x$tpos <- nrow(dat %>% filter(x == "Included" & Gold_Standard == "Included"))}) %>%
+                              unlist() %>%
+                              unname(),
+                            N_True_Negatives = lapply(dat[cols_r_tiab], function(x){x$tneg <- nrow(dat %>% filter(x == "Excluded" & Gold_Standard == "Excluded"))}) %>%
+                              unlist() %>%
+                              unname(),
+                            N_False_Positives = lapply(dat[cols_r_tiab], function(x){x$fpos <- nrow(dat %>% filter(x == "Included" & Gold_Standard == "Excluded"))}) %>%
+                              unlist() %>%
+                              unname(),
+                            N_False_Negatives = lapply(dat[cols_r_tiab], function(x){x$fneg <- nrow(dat %>% filter(x == "Excluded" & Gold_Standard == "Included"))}) %>%
+                              unlist() %>%
+                              unname())
+
+# Calculate precision
+result_r_tiab$Precision <- result_r_tiab$N_True_Positives / (result_r_tiab$N_True_Positives + result_r_tiab$N_False_Positives)
+
+# Reorder
+result_r_tiab <- result_r_tiab %>%
+  select(Screening_Type, Threshold, Sensitivity, Specificity, Precision, N_True_Positives, N_True_Negatives, N_False_Positives, N_False_Negatives)
+
+# Attach Manual FullText screening results onto the results dataframe
+results <- rbind(results, result_r_tiab)
+
+# Clean R environment
+rm(result_r_tiab, cols_r_tiab)
+```
+
+
+## Regex Full-Text Screening Analysis
+
+Use the caret package to work out the sensitivity and specificity of regex full-text screening. Add values to the results dataframe.
+
+```{r}
+# Create vectors containing names of all columns relevant to regex tiab screening
+cols_r_fulltext <- colnames(select(dat,contains("Regex_FullText_")))
+
+# Add results to dataframe
+result_r_fulltext <- data.frame(Screening_Type = rep("Regex_FullText", length(unique(dat$Regex_FullText))),
+                            Threshold = sort(unique(dat$Regex_FullText)),
+                            Sensitivity = lapply(dat[cols_r_fulltext], sensitivity,
+                                   reference = dat[["Gold_Standard"]], 
+                                   positive = "Included") %>%
+                              unlist() %>%
+                              unname(),
+                            Specificity = lapply(dat[cols_r_fulltext], specificity,
+                                   reference = dat[["Gold_Standard"]],
+                                   negative = "Excluded") %>%
+                              unlist() %>%
+                              unname(),
+                            N_True_Positives = lapply(dat[cols_r_fulltext], function(x){x$tpos <- nrow(dat %>% filter(x == "Included" & Gold_Standard == "Included"))}) %>%
+                              unlist() %>%
+                              unname(),
+                            N_True_Negatives = lapply(dat[cols_r_fulltext], function(x){x$tneg <- nrow(dat %>% filter(x == "Excluded" & Gold_Standard == "Excluded"))}) %>%
+                              unlist() %>%
+                              unname(),
+                            N_False_Positives = lapply(dat[cols_r_fulltext], function(x){x$fpos <- nrow(dat %>% filter(x == "Included" & Gold_Standard == "Excluded"))}) %>%
+                              unlist() %>%
+                              unname(),
+                            N_False_Negatives = lapply(dat[cols_r_fulltext], function(x){x$fneg <- nrow(dat %>% filter(x == "Excluded" & Gold_Standard == "Included"))}) %>%
+                              unlist() %>%
+                              unname())
+
+# Calculate precision
+result_r_fulltext$Precision <- result_r_fulltext$N_True_Positives / (result_r_fulltext$N_True_Positives + result_r_fulltext$N_False_Positives)
+
+# Reorder
+result_r_fulltext <- result_r_fulltext %>%
+  select(Screening_Type, Threshold, Sensitivity, Specificity, Precision, N_True_Positives, N_True_Negatives, N_False_Positives, N_False_Negatives)
+
+# Attach Manual FullText screening results onto the results dataframe
+results <- rbind(results, result_r_fulltext)
+
+# Clean R environment
+rm(result_r_fulltext, cols_r_fulltext)
+```
+
+# Save Clean Data
+
+Save a copy of the full results. This dataset is used in the analysis code which follows.
+
+```{r}
+# Write to csv
+write.csv(results, "data-analysis/full_data_for_analysis.csv", row.names = F)
+```

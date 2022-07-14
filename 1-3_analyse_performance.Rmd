@@ -1,0 +1,141 @@
+---
+title: "Citation Screening Comparison: Analyse Performance"
+author: "Emma Wilson"
+output: html_document
+---
+
+## Load packages
+
+```{r, message=FALSE, warning = FALSE}
+# Running RStudio and R Version  4.2.1
+
+library(dplyr)     #V1.0.9
+library(ggplot2)   #V3.3.6
+library(tidyr)     #V1.2.0
+library(patchwork) #V1.1.1
+```
+
+
+## Read in Data
+
+Read in the dataset containing full results.
+
+```{r}
+# Dataset of all results for analysis
+results <- read.csv("data-analysis/full_data_for_analysis.csv", stringsAsFactors = F)
+```
+
+
+# Add colourblind-friendly palette
+
+```{r}
+cbPalette <- c("#E69F00", "#CC79A7", "#56B4E9", "#009E73")
+```
+
+
+# Generate ROC Curve
+
+```{r}
+# Add FPR (false positive rate column) e.g. 1 minus specificity and 1 minus sensitivity
+results <- results %>%
+  mutate(FPR = 1- Specificity,
+         OneMinusSens = 1 - Sensitivity) %>%
+  rename("Screening Type" = Screening_Type)
+# Specify levels (for graph legend)
+results$"Screening Type" <- factor(results$"Screening Type", levels = c("Manual_TiAb", "Manual_FullText", "Regex_TiAb", "Regex_FullText"))
+# Reformat Screening Type (for graph legend)
+results$"Screening Type" <- sub("_", " ", results$"Screening Type")
+results$"Screening Type" <- sub("TiAb", "Title/Abstract", results$"Screening Type")
+# Specify labels for graph
+label=c("0.95", "0.99")
+
+
+# Plot ROC curve graph
+p <- ggplot(results, aes(FPR, Sensitivity, colour = `Screening Type`)) +
+  stat_summary(fun="mean", geom="line") + 
+  scale_colour_manual(values = cbPalette) +
+  geom_point(data = head(results, 2)) +
+  theme(legend.position = "right") +
+  geom_hline(yintercept = 0.99, linetype = "dashed") + geom_hline(yintercept = 0.95, linetype = "dashed") +
+  theme_light() + 
+  xlab("FPR (1 - Specificity)")
+
+# Plot inset
+inset <- ggplot(results, aes(FPR, Sensitivity, colour = `Screening Type`)) +
+  stat_summary(fun="mean", geom="line") + 
+  scale_colour_manual(values = cbPalette) +
+  geom_point(data = head(results, 2)) +
+  geom_hline(yintercept = 0.99, linetype = "dashed") + geom_hline(yintercept = 0.95, linetype = "dashed") +
+  theme_light() + 
+  coord_cartesian(xlim = c(0,0.02), ylim = c(0.75,1)) +
+  theme(legend.position = "none")
+
+# Merge
+p + inset_element(inset + theme(legend.position = "none"), right = 0.95, bottom = 0.05, left = 0.25, top = 0.75)
+```
+
+# Calculate Optimal Regex Thresholds
+
+If we consider 100% sensitivity and 100% specificity as the optimal performance, we can work out the optimal regex threshold using the Pythagoras Theorem, where:
+
+C^2 = (1 - Sensitivity)^2 and (1 - Specificity)^2
+
+The optimal regex threshold will have the smallest value of C.
+
+```{r}
+# For regex tiab:
+
+regex_tiab_results <- results %>%
+  rename(Screening_Type = "Screening Type") %>%
+  # Subset results
+  filter(Screening_Type == "Regex Title/Abstract") %>%
+  # Calculate 1 - Sensitivity
+  # Calculate C
+  mutate(OneMinusSens = 1 - Sensitivity,
+         C = sqrt(OneMinusSens^2 + FPR^2)) %>%
+  # Arrange C by low to high
+  arrange(C) %>%
+  # Subset only smallest value of C
+  head(1)
+
+# For regex full-text:
+
+regex_fulltext_results <- results %>%
+  rename(Screening_Type = "Screening Type") %>%
+  # Subset results
+  filter(Screening_Type == "Regex FullText") %>%
+  # Calculate 1 - Sensitivity
+  # Calculate C
+  mutate(OneMinusSens = 1 - Sensitivity,
+         C = sqrt(OneMinusSens^2 + FPR^2)) %>%
+  # Arrange C by low to high
+  arrange(C) %>%
+  # Subset only smallest value of C
+  head(1)
+
+# Get manual screening
+
+manual_results <- results %>%
+  rename(Screening_Type = "Screening Type") %>%
+  # Subset results
+  filter(Screening_Type == "Manual Title/Abstract" | Screening_Type == "Manual FullText") %>%
+  # Calculate 1 - Sensitivity
+  # Calculate C
+  mutate(OneMinusSens = 1 - Sensitivity,
+         C = sqrt(OneMinusSens^2 + FPR^2))
+
+
+# Merge optimal results
+optimal_results <- rbind(manual_results, regex_tiab_results, regex_fulltext_results)
+
+# Clear environment
+rm(regex_tiab_results, regex_fulltext_results, manual_results)
+```
+
+
+# Save optimal results
+
+```{r}
+write.csv(optimal_results, "data-analysis/optimal_results.csv", row.names = F)
+```
+

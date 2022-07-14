@@ -1,0 +1,168 @@
+---
+title: "Citation Screening Comparison: Data Cleaning"
+author: "Emma Wilson"
+output: html_document
+---
+
+## Load packages
+
+```{r, message=FALSE}
+# Running RStudio and R Version 4.2.1
+
+library(dplyr)      #V1.0.9
+```
+
+
+## Read in Data
+
+Read in the dataset containing all screened records, their manual screening decisions (Included or Excluded) and the number of matches between text and regex strings (Numeric data).
+
+```{r}
+# Dataset of all manual screening decisions and regex decisions
+dat <- read.csv("data-raw/screening_data_raw.csv", stringsAsFactors = F)
+```
+
+
+## Data Exclusion
+
+Some records need to be excluded where we cannot draw a valid comparison between manual and regex screening performance. Records are excluded if:
+
+- The regex is unable to read the full text version of the record
+- The record has no abstract
+- The record does not have an English-language full-text
+- The record is a conference abstract (and therefore do not have a full-text)
+
+```{r}
+# Filter records for exclusion where:
+
+# The full text file has NOT been read successfully
+exclude_unreadable_fulltext <- dat %>% filter(PDF_Status != "OK: File is read Successfully")
+# The abstract column contains 'NA', is blank, or is a single whitespace
+exclude_no_abstract <- dat %>% filter(is.na(Abstract) | Abstract == "" | Abstract == " ")
+# The record is not in English
+exclude_not_english <- dat %>% filter(Is_English == "No")
+# The record is a conference abstract, not a full journal article
+exclude_conference <- dat %>% filter(Is_Conference == "Yes")
+
+# Combine all record IDs to be excluded into a single vector
+exclude <- c(exclude_unreadable_fulltext$ID, exclude_no_abstract$ID, exclude_not_english$ID, exclude_conference$ID)
+
+# Remove excluded records from dataset
+dat <- dat %>% filter(!ID %in% exclude)
+
+# Clear R environment
+rm(exclude_unreadable_fulltext, exclude_no_abstract, exclude_not_english, exclude_conference, exclude)
+```
+
+
+## Identify Disagreements Between Manual and Regex Screening
+
+We assessed the following disagreements between manual and regex screening:
+
+- Record was excluded by manual tiab screening but matched the regex at least once
+- Record was included by manual tiab screening but did not match the regex
+- Record was excluded by manual full-text screening but matched the regex at least once
+- Record was included by manual full-text screening ad did not match the regex
+
+The following code finds such disagreemets and write them to a csv file for off-line assessment.
+
+```{r}
+# Check for disagreements between manual and regex screening
+disagreement <- dat %>%
+  filter(Manual_TiAb == "Excluded" & Regex_TiAb >= 1 | 
+           Manual_TiAb == "Included" & Regex_TiAb == 0 | 
+           Manual_FullText == "Excluded" & Regex_FullText >= 1 | 
+           Manual_FullText == "Included" & Regex_FullText == 0)
+
+# Save records with a disagreement to a csv file that can be downloaded, and validation decision added manually
+write.csv(disagreement, "data-raw/in_vitro_screening_disagreements.csv", row.names = F)
+```
+
+
+## Reconcile Disagreements Between Manual and Regex Screening
+
+Read in the csv with reconciled screening decisions.
+
+```{r}
+# Read in copy of "in_vitro_screening_disagreement.csv" with Validation column attached
+disagreement <- read.csv("data-raw/in_vitro_screening_disagreements_validated.csv", stringsAsFactors = F)
+```
+
+
+## Create 'Gold Standard'
+
+Where there was a disagreement between manual and regex screening, the reconciled (Validated) decision is taken as the 'gold standard' screening decision.
+
+Where there was no disagreement, the manual full-text screening decision is taken as the 'gold standard' screening decision.
+
+```{r}
+# For records without a disagreement:
+
+# Filter out records from disagreement dataset
+dat <- dat %>% filter(!ID %in% disagreement$ID)
+# Add Gold Standard column
+dat$Gold_Standard <- dat$Manual_FullText
+
+# For records with a disagreement:
+
+# Rename validation column to gold_standard
+disagreement <- disagreement %>%
+  rename(Gold_Standard = Validation)
+
+# Combine two datasets back into one
+dat <- rbind(dat, disagreement)
+
+# Clear R environment
+rm(disagreement)
+```
+
+
+## Determine Screening Decisions for Regex at Various Thresholds
+
+Instead of giving a binary screening decision (e.g. 'include' or 'exclude'), the code tells us how many times the regex matched the given text (tiab or full-text).
+
+The code below calculates the sensitivity and specificity of the regex at different thresholds.
+
+```{r}
+# For TiAb Regex Screening:
+
+# Create vector of regex matches for threshold cut points
+Threshold_rt <- unique(dat$Regex_TiAb) %>%
+  sort()
+# Loop through each cut point
+for(i in Threshold_rt){
+  cola <- paste("Regex_TiAb", i, sep= "_")
+  dat[[cola]] <- ifelse(dat$Regex_TiAb >= i, "Included", "Excluded")
+}
+# Reorder columns so Regex_FullText and Gold_Standard are at end
+dat <- dat %>%
+  relocate(Regex_FullText, Gold_Standard, .after = everything())
+
+# For FullText Regex Screening:
+
+# Create vector of regex matches for threshold cut points
+Threshold_rf <- unique(dat$Regex_FullText) %>%
+  sort()
+# Loop through each cut point
+for(i in Threshold_rf){
+  colb <- paste("Regex_FullText", i, sep= "_")
+  dat[[colb]] <- ifelse(dat$Regex_FullText >= i, "Included", "Excluded")
+}
+# Reorder columns Gold_Standard is at end
+dat <- dat %>%
+  relocate(Gold_Standard, .after = everything())
+
+# Clear R environment
+rm(cola, colb, i, Threshold_rf, Threshold_rt)
+```
+
+
+# Save Clean Data
+
+Save a copy of the cleaned and validated dataset. This dataset is used in the calculation code which follows.
+
+```{r}
+# Write to csv
+write.csv(dat, "data/screening_data_clean.csv", row.names = F)
+```
+

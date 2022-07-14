@@ -1,0 +1,71 @@
+---
+title: "Citation Screening Comparison: Search Term Retrieval Comparison"
+author: "Emma Wilson"
+output: html_document
+---
+
+## Load packages
+
+```{r, message=FALSE}
+# Running RStudio and R Version 3.6.3
+
+library(caret)   #V6.0-86
+library(dplyr)   #V1.0.7
+```
+
+## Read in Data
+
+Read in the dataset containing all cleaned and validated screening data, and the dataset containing titles from the restricted term search.
+
+```{r}
+# Dataset of all manual screening decisions and regex decisions
+dat <- read.csv("data/screening_data_clean.csv", stringsAsFactors = T)
+
+#Dataset containing titles of all records from restricted search terms
+restrictedsearch <- read.csv("data-raw/restricted_search_20220505_titles.csv", stringsAsFactors = F)
+```
+
+## Match Data Using Title
+
+```{r}
+# Filter full dataset to identify records where title also appears in restricted terms search
+matched <- dat %>%
+  filter(Title %in% restrictedsearch$Title)
+```
+
+# Create New Column to Store Information
+
+```{r}
+# Create new column and assign variable 'Yes'
+matched$InRestrictedSearch <- "Yes"
+
+# Subset data not matching on title and create new column for 'No'
+notmatched <- dat %>%
+  filter(!Title %in% restrictedsearch$Title) %>%
+  mutate(InRestrictedSearch = "No")
+
+#Merge data back together
+dat <- rbind(matched, notmatched)
+```
+
+# Identify If Any Included Studies Would Have Been Missed by Restricted Search
+
+```{r}
+# Find missed studies
+missed <- dat %>%
+  filter(Gold_Standard == "Included" & InRestrictedSearch == "No")
+
+# Number of missed studies
+N_missed <- nrow(missed)
+
+# Total number of included studies
+N_totalincluded <- nrow(dat %>% filter(Gold_Standard == "Included"))
+```
+
+# Calculate 'overinflated' performance of human TiAB if restricted search had been used 
+
+```{r}
+m_tiab_restricted_sen <- sensitivity(matched$Manual_TiAb, matched$Gold_Standard, positive = "Included")
+m_tiab_restricted_spe <- specificity(dat$Manual_TiAb, dat$Gold_Standard, negative = "Excluded")
+```
+
