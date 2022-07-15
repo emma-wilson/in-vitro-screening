@@ -18,7 +18,16 @@ Data are stored in the following folders:
 - **data-raw:** raw data to be processed
 - **data:** data which have undergone some processing
 - **data-analysis:** final clean datasets
+- **data-ml_input:** input data required to train ML
+- **data-ml_output:** output data from ML
+
+## Functions
+
+Machine learning (ML) functions are in the 'functions' folder. Please not that the information required to configure the ML API are **not** included as we do not have permission to share this.
 
 ## Plots
 
-Plot outputs (in PDF file format) are in the `plots` folder.
+Plot outputs (in PDF file format) are in the `figures` folder.
+
+- **screening_roc.pdf:** figure from screening comparison part of project
+- **ml_roc.pdf:** figure from machine learning part of project
