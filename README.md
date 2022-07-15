@@ -23,7 +23,7 @@ Data are stored in the following folders:
 
 ## Functions
 
-Machine learning (ML) functions are in the 'functions' folder. Please not that the information required to configure the ML API are **not** included as we do not have permission to share this.
+Machine learning (ML) functions are in the `functions` folder. Please not that the information required to configure the ML API are **not** included as we do not have permission to share this.
 
 ## Plots
 
