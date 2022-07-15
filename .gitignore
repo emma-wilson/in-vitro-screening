@@ -37,3 +37,9 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+
+# ML configure file
+configure.R
+
+# R project
+in-vitro-screening.Rproj
