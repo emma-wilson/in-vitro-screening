@@ -1,0 +1,134 @@
+---
+title: "Machine Learning: Corrected"
+author: "Emma Wilson"
+output: html_document
+---
+
+Please note that this code repository does not contain the necessary configure files to access the machine learning API. These were provided by a colleague (Prof James Thomas, EPPI-Centre).
+
+# Load packages and functions
+
+```{r}
+library(AzureStor)
+library(magrittr)
+library(rlang)
+library(httr)
+library(RCurl)
+library(rjson)
+library(tidyr)
+
+source('functions/syrfDBReader.R')
+source('functions/ioeAPI.R')
+source('functions/syrfIoeHelper.R')
+source('functions/analysis.R')
+
+source("configure.R") # not included in repository
+```
+
+
+# Set Imputs
+
+```{r}
+runTimestamp <- format(Sys.time(), "%Y%m%d%H%M%S")
+projectName <- "InVitro_Corrected_2022_03_31"
+
+#Prepare the training data and testing data
+fileFolders <- CreateFileFolders(paste0("data-ml-input/",projectName,"/"), paste0("data-ml-output/",projectName,"/"))
+outputFilenames <- CreateMLFilenames(fileFolders$OutputFolder, runTimestamp)
+```
+
+
+# Read In Data
+
+```{r}
+# Read in selected columns
+# NPQIP data preferentially added to training set
+sourceData<-rbind(read.csv(paste0(fileFolders$InputFolder, "SYRF_screening.csv"), stringsAsFactors = F)[,c("Title","Abstract","Inclusion","ID")]%>% 
+                    mutate(cat="")
+                  , read.csv(paste0(fileFolders$InputFolder, "NPQIP_screening.csv"), stringsAsFactors = F)[,c("Title","Abstract","Inclusion","ID")] %>% 
+                    mutate(cat="Train"))
+
+# Read in erorr correction
+errorcorrection <- read.csv(paste0(fileFolders$InputFolder, "errorcorrection_090421.csv"), stringsAsFactors = F)[,c("Title", "Abstract", "Decision", "Keywords")] %>%
+  rename(Inclusion = Decision,
+         ID = Keywords) %>%
+  mutate(cat="Train")
+
+# Reformat data
+errorcorrection$Inclusion <- sub("Included", "1", errorcorrection$Inclusion)
+errorcorrection$Inclusion <- sub("Excluded", "-1", errorcorrection$Inclusion)
+
+# Make integer
+errorcorrection$Inclusion <- as.integer(errorcorrection$Inclusion)
+
+# Subset data
+sourceData_minuserror <- sourceData %>%
+  filter(!ID %in% errorcorrection$ID)
+
+# Combine corrected data
+sourceData <- rbind(sourceData_minuserror, errorcorrection)
+```
+
+
+# Process Data
+
+```{r}
+# Process data in format required for machine learning API
+ioeApiData <- sourceData %>%
+  mutate(
+    REVIEW_ID = "IN_VITRO_TRAINING",
+    KEYWORDS = "",
+    LABEL = ifelse(Inclusion == -1, 0,ifelse(Inclusion == 1, 1, 99))
+  ) %>%
+  select(
+    TITLE = Title,
+    ABSTRACT = Abstract,
+    ITEM_ID = ID,
+    cat = cat,
+    REVIEW_ID, KEYWORDS, LABEL
+  )
+
+# 1 = include, 0 = exclude
+print(table(ioeApiData$LABEL))
+
+# Write data and label files out as IOE API protocol
+WriteFilesForIOE(ioeApiData, outputFilenames)
+```
+
+
+# Send Data to Machine Learning API
+
+```{r}
+# Get start time
+start_time <- Sys.time()
+
+# Set file names
+filenames <- CreateFileNamesForIOEAPI(outputFilenames$Records, outputFilenames$Decisions
+                                      , outputFilenames$Vectors ,outputFilenames$Results)
+
+# Send data to ML for processing
+TrainCollection(filenames, projectName)
+
+# Get results
+results <- read.csv(filenames$ResultsFileName, header = FALSE,col.names = c("score", "ITEM_ID","REVIEW_ID") )
+
+# Get end time
+end_time <- Sys.time()
+runningTime <- end_time - start_time
+
+# Print running time
+print(paste0("running time: ", runningTime))
+```
+
+
+# Analyse Results
+
+```{r}
+# Analyse results
+analysisResult <- Analysis(outputFilenames$Results, outputFilenames$TestDecisions, outputFilenames$Analysis)
+
+# Plot performance
+PlotPerformance(analysisResult, outputFilenames$PerformancePNG, projectName)
+
+```
+

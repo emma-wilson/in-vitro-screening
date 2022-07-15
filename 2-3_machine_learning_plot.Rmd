@@ -1,0 +1,51 @@
+---
+title: 'Machine Learning: Plot'
+author: "Emma Wilson"
+output: html_document
+---
+
+# Load packages
+
+```{r}
+library(ggplot2) # Version 3.3.6
+```
+
+# Add colourblind-friendly palette
+
+```{r}
+cbPalette2 <- c("#E69F00", "#56B4E9")
+```
+
+# Read in data
+
+```{r}
+# initial performance results
+dat_initial <- read.csv("data-ml-output/InVitro_initial_2022_03_31/20220331110026_analysis.csv", stringsAsFactors = F, nrows = 100) %>% mutate(Run = "Initial")
+# corrected performance results
+dat_corrected <- read.csv("data-ml-output/InVitro_Corrected_2022_03_31/20220331112336_analysis.csv", stringsAsFactors = F, nrows = 100) %>% mutate(Run = "Corrected")
+
+# Merge
+dat <- rbind(dat_initial, dat_corrected) %>%
+  mutate(FPR = 1 - Specificity) %>%
+  select(Run,
+         Thresholds,
+         Sensitivity,
+         Specificity,
+         FPR,
+         Precision,
+         Chosen)
+```
+
+# Plot ROC curve
+
+```{r}
+ml_p <- ggplot(dat, aes(FPR, Sensitivity, colour = `Run`)) +
+  stat_summary(fun="mean", geom="line") + 
+  scale_colour_manual(values = cbPalette2) +
+  theme(legend.position = "right") +
+  theme_light() + 
+  xlab("FPR (1 - Specificity)") +
+  geom_vline(xintercept = 0.175792507, linetype = "dashed", colour = "#E69F00") + geom_vline(xintercept = 0.150417827, linetype = "dashed", colour = "#56B4E9") +
+  geom_hline(yintercept = 0.95, linetype = "dashed")
+```
+
