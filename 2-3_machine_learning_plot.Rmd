@@ -46,6 +46,7 @@ ml_p <- ggplot(dat, aes(FPR, Sensitivity, colour = `Run`)) +
   theme_light() + 
   xlab("FPR (1 - Specificity)") +
   geom_vline(xintercept = 0.175792507, linetype = "dashed", colour = "#E69F00") + geom_vline(xintercept = 0.150417827, linetype = "dashed", colour = "#56B4E9") +
-  geom_hline(yintercept = 0.95, linetype = "dashed")
+  geom_hline(yintercept = 0.95, linetype = "dashed") +
+  theme(text = element_text(size = 16))
 ```
 

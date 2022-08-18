@@ -58,7 +58,8 @@ p <- ggplot(results, aes(FPR, Sensitivity, colour = `Screening Type`)) +
   theme(legend.position = "right") +
   geom_hline(yintercept = 0.99, linetype = "dashed") + geom_hline(yintercept = 0.95, linetype = "dashed") +
   theme_light() + 
-  xlab("FPR (1 - Specificity)")
+  xlab("FPR (1 - Specificity)") +
+  theme(text = element_text(size = 16))
 
 # Plot inset
 inset <- ggplot(results, aes(FPR, Sensitivity, colour = `Screening Type`)) +
@@ -68,7 +69,10 @@ inset <- ggplot(results, aes(FPR, Sensitivity, colour = `Screening Type`)) +
   geom_hline(yintercept = 0.99, linetype = "dashed") + geom_hline(yintercept = 0.95, linetype = "dashed") +
   theme_light() + 
   coord_cartesian(xlim = c(0,0.02), ylim = c(0.75,1)) +
-  theme(legend.position = "none")
+  theme(legend.position = "none") +
+  theme(text = element_text(size = 14)) +
+  scale_y_continuous(breaks = seq(0.70, 1.00, by = 0.10)) +
+  scale_x_continuous(breaks = seq(0, 0.02, by = 0.01))
 
 # Merge
 p + inset_element(inset + theme(legend.position = "none"), right = 0.95, bottom = 0.05, left = 0.25, top = 0.75)
