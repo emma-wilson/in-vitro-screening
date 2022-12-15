@@ -29,5 +29,6 @@ Machine learning (ML) functions are in the `functions` folder. Please not that t
 
 Plot outputs (in PDF file format) are in the `figures` folder.
 
+- **regex_histogram.pdf:** histograms showing number of regex matches against (a) tiab and (b) full text
 - **screening_roc.pdf:** figure from screening comparison part of project
 - **ml_roc.pdf:** figure from machine learning part of project
