@@ -9,9 +9,10 @@ output: html_document
 ```{r, message=FALSE, warning = FALSE}
 # Running RStudio and R Version  4.2.1
 
-library(caret)   #V6.0-92
-library(dplyr)   #V1.0.9
-library(ggplot2) #V3.3.6
+library(caret)     #V6.0-92
+library(dplyr)     #V1.0.9
+library(ggplot2)   #V3.3.6
+library(cowplot)   #v1.1.1
 ```
 
 
@@ -23,6 +24,36 @@ Read in the dataset containing all cleaned and validated screening data.
 # Dataset of all manual screening decisions and regex decisions
 dat <- read.csv("data/screening_data_clean.csv", stringsAsFactors = T)
 ```
+
+
+## Create hisotgram to show regex matches
+
+Show the number of studies which matched the regex zero times, once, twice, etc...
+
+```{r}
+# Remove instances where Regex matched 0 to make the histograms easier to read
+dat_tiab <- dat %>% filter(Regex_TiAb != 0)
+dat_ft <- dat %>% filter(Regex_FullText != 0)
+# Create histogram of TiAb matches
+h_tiab <- ggplot(dat_tiab, aes(x=Regex_TiAb)) + 
+  geom_histogram(bins = 10, color="black", fill="#009E73") + 
+  theme_light() + 
+  ylab("Number of Studies") +
+  xlab("Number of Regex Matches\nwith Title and Abstract") +
+  theme(text = element_text(size = 20)) +
+  scale_x_continuous(breaks = seq(1, 15, by = 2))
+# Create histogram of full text matches
+h_ft <- ggplot(dat_ft, aes(x=Regex_FullText)) + 
+  geom_histogram(bins = 56, color="black", fill="#56B4E9") +
+  theme_light() + 
+  ylab("Number of Studies") +
+  xlab("Number of Regex Matches\nwith Full Text") +
+  theme(text = element_text(size = 20)) +
+  scale_x_continuous(breaks = seq(1, 281, by = 40))
+# Plot both histograms side by side
+plot_grid(h_tiab, h_ft, labels = "AUTO")
+```
+
 
 
 # Create Empty Dataframe to Store Results
