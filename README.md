@@ -1,6 +1,6 @@
 # In Vitro Screening Comparison
 
-Data and code to accompany the paper "Citation screening for in vitro systematic reviews: a comparison of screening methods and training of a machine learning classifier".
+Data and code to accompany the paper ["Screening for in vitro systematic reviews: a comparison of screening methods and training of a machine learning classifier"](https://doi.org/10.1042/CS20220594) published in *Clinical Science*.
 
 ## Code scripts
 
